@@ -2,9 +2,28 @@ package Shell::Tiny;
 use 5.008001;
 use strict;
 use warnings;
+use Shell::Tiny::Parser;
+use Shell::Tiny::Executor;
 
 our $VERSION = "0.01";
 
+sub new {
+    my $class = shift;
+    return bless +{
+    }, $class;
+}
+
+sub parse {
+    my $self = shift;
+    my $str = shift;
+    return Shell::Tiny::Parser->new->parse($str);
+}
+
+sub print {
+    my $self = shift;
+    my $ast = shift;
+    Shell::Tiny::Executor->dump($ast, 0);
+}
 
 
 1;
