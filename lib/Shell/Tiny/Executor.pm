@@ -2,6 +2,7 @@ package Shell::Tiny::Executor;
 use strict;
 use warnings;
 
+use IO::Handle;
 use POSIX ":sys_wait_h";
 
 use Shell::Tiny::Node::SubShell;
@@ -40,7 +41,7 @@ sub traverse {
     }
     if (is_cmd($ast)) {
         $self->append($ast->command, @{ $ast->args });
-        $self->execute if parent_is_root($ast);
+        $self->execute unless parent_is_pipe($ast);
         return;
     }
     die "Unexpected";
@@ -56,32 +57,42 @@ sub clear {
     $self->{commands} = +[];
 }
 
-use Data::Dumper;
-
 sub execute {
     my $self = shift;
     my $commands = $self->{commands};
     my $pipes = $self->pipes;
-    print Dumper $pipes;
-    print Dumper $commands;
-    for (my $i = 0; $i < @{ $self->{commands} }; $i++) {
-        my $cmd = $self->{commands}->[$i];
+    for (my $i = 0; $i < @$pipes; $i++) {
+        my $cmd = $commands->[$i];
         if (my $pid = fork) {
-            close $pipes->[$i + 1]{writer}; # next out handle
-            close $pipes->[$i]{reader}; # in handle
+            close $pipes->[$i]{writer} if $cmd;
+            #close $pipes->[$i]{reader} if $i != 0;
         } else {
             defined $pid or die "Could not fork: ".$!;
-            close $pipes->[$i]{writer}; # out handle
-            close $pipes->[$i + 1]{reader}; # next in handle
-
-            open STDIN, '<&', $pipes->[$i]{reader}; # in handle
-            open STDOUT, '>&', $pipes->[$i + 1]{writer}; # next out handle
-            open STDERR, '>&', $pipes->[$i + 1]{writer}; # next out handle
-
-            exec @$cmd;
+            #close $pipes->[$i]{reader} if $i + 1 != @$pipes; # next in handle
+            if ($cmd) {
+                open STDIN,  '<&=', $pipes->[$i]{reader};
+                open STDOUT, '>&=', $pipes->[$i]{writer};
+                open STDERR, '>&=', $pipes->[$i]{writer};
+                exec @$cmd;
+            } else {
+                my $r = $pipes->[$i]{reader};
+                my $w = $pipes->[$i]{writer};
+                print <$r>;
+                #while (<$r>) { print $w $_ }
+                exit;
+                #open $pipes->[$i]{reader}, '>&=', $pipes->[$i]{writer};
+            }
         }
     }
+    # my $r = $pipes->[@$commands]{reader};
+    # my $w = $pipes->[@$commands]{writer};
+    # while (<$r>) {
+    #     print $w $_;
+    # }
     1 while wait != -1;
+    $self->clear;
+
+    #print $pipes->[@$commands]{reader};
 }
 
 sub pipes {
@@ -90,22 +101,20 @@ sub pipes {
     my @pipes;
     for (my $i = 1; $i <= @$commands; $i++) {
         pipe my ($reader, $writer);
-        select $writer;
-        $| = 1;
-        select STDOUT;
+        $writer->autoflush(1);
         if ($i == 1) {
             push @pipes, +{
-                reader => *STDIN,
+                reader => \*STDIN,
                 writer => $writer,
             }, +{
                 reader => $reader,
-                writer => *STDOUT,
+                writer => \*STDOUT,
             };
         } else {
             $pipes[$i - 1]->{writer} = $writer;
             push @pipes, +{
                 reader => $reader,
-                writer => *STDOUT,
+                writer => \*STDOUT,
             };
         }
     }
