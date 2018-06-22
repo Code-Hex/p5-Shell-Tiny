@@ -25,6 +25,12 @@ sub print {
     Shell::Tiny::Executor->dump($ast, 0);
 }
 
+sub run {
+    my $self = shift;
+    my $ast = shift;
+    Shell::Tiny::Executor->new->traverse($ast);
+}
+
 
 1;
 __END__
