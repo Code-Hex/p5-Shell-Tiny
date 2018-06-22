@@ -60,26 +60,26 @@ sub dump {
     my $depth = shift;
 
     if (is_pipe($ast)) {
-        printf "|%s %s\n", '----'x($depth+1), ref $ast;
+        printf "%s %s\n", '|----'x($depth+1), ref $ast;
         $self->dump($ast->left, $depth + 1) if $ast->left;
         $self->dump($ast->right, $depth + 1) if $ast->right;
         return;
     }
     if (is_and($ast)) {
-        printf "|%s %s\n", '----'x($depth+1), ref $ast;
+        printf "%s %s\n", '|----'x($depth+1), ref $ast;
         $self->dump($ast->left, $depth + 1) if $ast->left;
         $self->dump($ast->right, $depth + 1) if $ast->right;
         return;
     }
     if (is_grp($ast)) {
         die "Unexpected node" unless $ast->node;
-        printf "|%s %s\n", '----'x($depth+1), ref $ast;
+        printf "%s %s\n", '|----'x($depth+1), ref $ast;
         $self->dump($ast->node, $depth + 1);
         return;
     }
     if (is_cmd($ast)) {
-        printf "|%s %s (cmd=%s, args=%s)\n",
-                '----'x($depth+1),
+        printf "%s %s (cmd=%s, args=%s)\n",
+                '|----'x($depth+1),
                 ref $ast,
                 $ast->command,
                 @{ $ast->args } ? '[' . join(', ', @{ $ast->args }) . ']' : 'nothing';
