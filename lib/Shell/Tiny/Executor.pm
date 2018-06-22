@@ -2,6 +2,8 @@ package Shell::Tiny::Executor;
 use strict;
 use warnings;
 
+use POSIX ":sys_wait_h";
+
 use Shell::Tiny::Node::SubShell;
 use Shell::Tiny::Node::Command;
 use Shell::Tiny::Node::Pipe;
@@ -9,26 +11,61 @@ use Shell::Tiny::Node::And;
 
 sub new {
     my $class = shift;
-    return bless +{}, $class;
+    return bless +{
+        stdin  => \*STDIN,
+        stdout => \*STDOUT,
+    }, $class;
 }
 
-sub walk {
-    my $self     = shift;
-    my $ast      = shift;
-    my $callback = shift;
-
+sub traverse {
+    my $self = shift;
+    my $ast  = shift;
+    if (is_pipe($ast)) {
+        $self->traverse($ast->left) if $ast->left;
+        $self->traverse($ast->right) if $ast->right;
+        return;
+    }
+    if (is_and($ast)) {
+        $self->traverse($ast->left) if $ast->left;
+        $self->traverse($ast->right) if $ast->right;
+        return;
+    }
+    if (is_grp($ast)) {
+        die "Unexpected node" unless $ast->node;
+        $self->traverse($ast->node);
+        return;
+    }
+    if (is_cmd($ast)) {
+        $self->exec($ast->command, @{ $ast->args });
+        return;
+    }
+    die "Unexpected";
 }
 
-=pod
-$self->dump($ast, 0)
-=cut
+# sub exec {
+#     my $self = shift;
+#     my @cmd = @_;
+#     if (my $pid = fork) {
+
+#     } else {
+#         exec @cmd;
+#     }
+#     waitpid $pid, WNOHANG;
+# }
+
 
 sub dump {
     my $self  = shift;
     my $ast   = shift;
     my $depth = shift;
 
-    if (is_and($ast) || is_pipe($ast)) {
+    if (is_pipe($ast)) {
+        printf "|%s %s\n", '----'x($depth+1), ref $ast;
+        $self->dump($ast->left, $depth + 1) if $ast->left;
+        $self->dump($ast->right, $depth + 1) if $ast->right;
+        return;
+    }
+    if (is_and($ast)) {
         printf "|%s %s\n", '----'x($depth+1), ref $ast;
         $self->dump($ast->left, $depth + 1) if $ast->left;
         $self->dump($ast->right, $depth + 1) if $ast->right;

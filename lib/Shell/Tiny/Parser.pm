@@ -47,13 +47,9 @@ sub _parse_shell {
 
     my $left;
     goto RIGHT if $left = $self->_parse_sub_shell();
-    goto RIGHT if $left = $self->_parse_identifier();
+    goto RIGHT if $left = $self->_parse_pipe();
     return;
 RIGHT:
-    if (my $right = $self->_parse_pipe()) {
-        return Shell::Tiny::Node::Pipe->make($left, $right);
-    }
-
     if (my $right = $self->_parse_and()) {
         return Shell::Tiny::Node::And->make($left, $right);
     }
@@ -74,11 +70,12 @@ sub _parse_sub_shell {
 
 sub _parse_pipe {
     my $self = shift;
-    
-    return unless /\G(?:\s*)?\|(?:\s*)?/mgc;
 
-    if (my $right = $self->_parse_shell) {
-        return $right;
+    my $left = $self->_parse_identifier();
+    return $left unless /\G(?:\s*)?\|(?:\s*)?/mgc;
+
+    if (my $right = $self->_parse_pipe) {
+        return Shell::Tiny::Node::Pipe->make($left, $right);
     }
 
     return;
