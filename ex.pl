@@ -8,6 +8,8 @@ BEGIN { unshift @INC, "$FindBin::Bin/lib" }
 use Shell::Tiny;
 
 my $sh = Shell::Tiny->new;
-my $ast = $sh->parse("(echo -n hello) | cat -n | pbcopy && pbpaste");
-$sh->print($ast);
+#my $ast = $sh->parse("echo -n hello | cat -n | pbcopy && pbpaste");
+my $ast = $sh->parse("cat | cat -n && echo hello");
+#$sh->print($ast);
+$sh->run($ast);
 #print Dumper $sh;

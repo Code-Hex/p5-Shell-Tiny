@@ -64,53 +64,34 @@ sub execute {
     for (my $i = 0; $i < @$pipes; $i++) {
         my $cmd = $commands->[$i];
         if (my $pid = fork) {
-            close $pipes->[$i]{writer} if $cmd;
-            #close $pipes->[$i]{reader} if $i != 0;
+            close $pipes->[$i]{writer} if $i + 1 != @$pipes;
         } else {
             defined $pid or die "Could not fork: ".$!;
-            #close $pipes->[$i]{reader} if $i + 1 != @$pipes; # next in handle
             if ($cmd) {
                 open STDIN,  '<&=', $pipes->[$i]{reader};
                 open STDOUT, '>&=', $pipes->[$i]{writer};
                 open STDERR, '>&=', $pipes->[$i]{writer};
                 exec @$cmd;
-            } else {
-                my $r = $pipes->[$i]{reader};
-                my $w = $pipes->[$i]{writer};
-                print <$r>;
-                #while (<$r>) { print $w $_ }
-                exit;
-                #open $pipes->[$i]{reader}, '>&=', $pipes->[$i]{writer};
             }
         }
     }
-    # my $r = $pipes->[@$commands]{reader};
-    # my $w = $pipes->[@$commands]{writer};
-    # while (<$r>) {
-    #     print $w $_;
-    # }
     1 while wait != -1;
     $self->clear;
-
-    #print $pipes->[@$commands]{reader};
 }
 
 sub pipes {
     my $self = shift;
     my $commands = $self->{commands};
     my @pipes;
-    for (my $i = 1; $i <= @$commands; $i++) {
-        pipe my ($reader, $writer);
-        $writer->autoflush(1);
-        if ($i == 1) {
+    for (my $i = 0; $i < @$commands; $i++) {
+        if ($i == 0) {
             push @pipes, +{
                 reader => \*STDIN,
-                writer => $writer,
-            }, +{
-                reader => $reader,
                 writer => \*STDOUT,
             };
         } else {
+            pipe my ($reader, $writer);
+            $writer->autoflush(1);
             $pipes[$i - 1]->{writer} = $writer;
             push @pipes, +{
                 reader => $reader,
